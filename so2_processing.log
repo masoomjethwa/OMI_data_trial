@@ -1,0 +1,11 @@
+2025-09-26 22:16:39,982 [INFO] Starting batch processing of .he5 files...
+2025-09-26 22:16:39,982 [INFO] XSD schema saved to output\h5_structure.xsd
+2025-09-26 22:16:39,982 [INFO] Found 9 files to process.
+2025-09-26 22:16:39,982 [INFO] Processing file: OMI-Aura_L2G-OMSO2G_2004m1002_v003-2020m0526t135751.SUB.he5
+2025-09-26 22:16:39,982 [INFO] Processing file: OMI-Aura_L2G-OMSO2G_2004m1004_v003-2020m0526t135744.SUB.he5
+2025-09-26 22:16:39,982 [INFO] Processing file: OMI-Aura_L2G-OMSO2G_2004m1006_v003-2020m0526t135644.SUB.he5
+2025-09-26 22:16:39,990 [INFO] Processing file: OMI-Aura_L2G-OMSO2G_2004m1008_v003-2020m0526t135746.SUB.he5
+2025-09-26 22:16:40,044 [ERROR] XML validation exception for OMI-Aura_L2G-OMSO2G_2004m1006_v003-2020m0526t135644.SUB.xml: Element '{http://www.w3.org/2001/XMLSchema}element', attribute 'ref': The QName value 'Group' does not resolve to a(n) element declaration., line 34
+2025-09-26 22:16:40,044 [ERROR] XML validation exception for OMI-Aura_L2G-OMSO2G_2004m1002_v003-2020m0526t135751.SUB.xml: Element '{http://www.w3.org/2001/XMLSchema}element', attribute 'ref': The QName value 'Group' does not resolve to a(n) element declaration., line 34
+2025-09-26 22:16:40,044 [ERROR] XML validation exception for OMI-Aura_L2G-OMSO2G_2004m1004_v003-2020m0526t135744.SUB.xml: Element '{http://www.w3.org/2001/XMLSchema}element', attribute 'ref': The QName value 'Group' does not resolve to a(n) element declaration., line 34
+2025-09-26 22:16:40,048 [ERROR] XML validation exception for OMI-Aura_L2G-OMSO2G_2004m1008_v003-2020m0526t135746.SUB.xml: Element '{http://www.w3.org/2001/XMLSchema}element', attribute 'ref': The QName value 'Group' does not resolve to a(n) element declaration., line 34
