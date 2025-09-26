@@ -1,126 +1,91 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Visualize SO₂ with NASA OMI Data
+@author: masoom
 
-Data Source: https://towardsdatascience.com/visualize-the-invisible-so2-with-nasa-data-and-python-2619f8ed4ea1
-
-@author: mp10
-@coding assistant: [TGC-DD26092025]
+This script reads ozone profile data from an OMI HDF-EOS5 file and plots the
+ozone vertical profile for a specific time and cross-track position.
 """
 
-# pip install numpy pandas matplotlib seaborn h5py folium pillow
-
-from pathlib import Path
-from typing import List
-import numpy as np
-import pandas as pd
+import os
 import h5py
-import folium
-from folium.plugins import HeatMap
+import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 
-# === Constants ===
-DATA_DIR = Path(".")  # 🔁 Replace with your actual path, e.g., Path("/Users/user/SO2_Data")
-SO2_KEY = 'HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/ColumnAmountSO2'
-LAT_KEY = 'HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Latitude'
-LON_KEY = 'HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Longitude'
-FILL_VALUE_THRESHOLD = -1e30  # Used by NASA as missing data flag
+FILE_NAME = 'OMI-Aura_L2-OMTO3_2021m0401t0533-o88889_v003-2021m0401t105813.he5'
+PATH = '/HDFEOS/SWATHS/O3Profile'
 
+# Time dimension size = 329
+# Lat/Lon dimensions = 329x30
+# O3 dimension = 329x30x18
+# Pressure dimension = 329x30x19
+# 30 is the cross-track dimension
+# Pressure has 19 points because it includes layer bounds (18 layers + bounds)
 
-def load_hdf5_files(directory: Path, extension: str = "*.he5") -> List[h5py.File]:
-    """
-    Load all readable HDF5 files from the specified directory.
-    """
-    datasets: List[h5py.File] = []
+# Parameters to subset data
+tdim = 26      # Time index (0 to 328)
+track = 0      # Cross-track index (0 to 29)
 
-    for file in directory.glob(extension):
-        try:
-            datasets.append(h5py.File(file, "r"))
-        except (OSError, IOError) as e:
-            print(f"[⚠️] Could not read file: {file.name} — {e}")
+with h5py.File(FILE_NAME, 'r') as f:
+    # Access ozone data for given time and track
+    varname_o3 = PATH + '/Data Fields/O3'
+    ozone_data = f[varname_o3][tdim, track, :]
+    
+    # Read attributes for metadata
+    attrs = f[varname_o3].attrs
+    missing_value = attrs['MissingValue']
+    fill_value = attrs['_FillValue']
+    title = attrs['Title'].decode('utf-8')
+    units = attrs['Units'].decode('utf-8')
+    
+    # Access pressure data (bounds)
+    varname_pressure = PATH + '/Geolocation Fields/Pressure'
+    pressure_all = f[varname_pressure][tdim, track, :]
+    
+    # Pressure units and fill value
+    pres_units = f[varname_pressure].attrs['Units'].decode('utf-8')
+    pres_fill_value = f[varname_pressure].attrs['_FillValue']
+    
+    # Select pressure corresponding to the ozone layers (skip surface pressure)
+    pressure = pressure_all[1:]
+    
+    # Access time data
+    varname_time = PATH + '/Geolocation Fields/Time'
+    time = f[varname_time][:]
+    
+    # Replace fill and missing values with np.nan for ozone
+    ozone_data = np.where((ozone_data == missing_value) | (ozone_data == fill_value), np.nan, ozone_data)
+    ozone_masked = np.ma.masked_invalid(ozone_data)
+    
+    # Replace fill values with np.nan for pressure
+    pressure = np.where(pressure == pres_fill_value, np.nan, pressure)
+    pressure_masked = np.ma.masked_invalid(pressure)
 
-    return datasets
-
-
-def extract_dataset_field(dataset: List[h5py.File], key: str) -> List[float]:
-    """
-    Extract and flatten data from a specific dataset key across all HDF5 files.
-    """
-    extracted: List[float] = []
-
-    for h5_file in dataset:
-        try:
-            data = h5_file[key][()]  # Load full numpy array
-            if data.ndim == 3:
-                data = data[1, :, :]  # Use second time slice if present
-            flat_data = data.flatten().tolist()
-
-            # Replace fill values with NaN
-            cleaned = [np.nan if val < FILL_VALUE_THRESHOLD or np.isnan(val) else float(val)
-                       for val in flat_data]
-
-            extracted.extend(cleaned)
-
-        except KeyError:
-            print(f"[⚠️] Key not found in file: {key}")
-        except Exception as e:
-            print(f"[⚠️] Error reading key '{key}': {e}")
-
-    return extracted
-
-
-def create_so2_dataframe(lat: List[float], lon: List[float], so2: List[float]) -> pd.DataFrame:
-    """
-    Create a DataFrame from latitude, longitude, and SO2 values.
-    """
-    df = pd.DataFrame(zip(lat, lon, so2), columns=["Lat", "Long", "SO2"])
-    return df.dropna()  # Remove invalid rows
-
-
-def generate_folium_heatmap(df: pd.DataFrame, min_opacity: float = 0.05) -> folium.Map:
-    """
-    Generate a folium heatmap from a DataFrame of Lat, Long, SO2 values.
-    """
-    heat_data = [[row.Lat, row.Long, row.SO2] for row in df.itertuples(index=False)]
-
-    fmap = folium.Map()
-    HeatMap(heat_data, min_opacity=min_opacity).add_to(fmap)
-    folium.LayerControl().add_to(fmap)
-    return fmap
-
-
-def main() -> None:
-    """
-    Execute the SO2 data loading, processing, and visualization pipeline.
-    """
-    print("📦 Loading SO2 satellite data...")
-    dataset = load_hdf5_files(DATA_DIR)
-
-    if not dataset:
-        print("❌ No valid HDF5 files found. Exiting.")
-        return
-
-    print("📊 Extracting fields: Latitude, Longitude, SO2...")
-    latitudes = extract_dataset_field(dataset, LAT_KEY)
-    longitudes = extract_dataset_field(dataset, LON_KEY)
-    so2_values = extract_dataset_field(dataset, SO2_KEY)
-
-    print("🧮 Creating DataFrame...")
-    df = create_so2_dataframe(latitudes, longitudes, so2_values)
-    print(df.head())
-
-    print("🗺️ Generating heatmap...")
-    heatmap = generate_folium_heatmap(df)
-
-    output_path = Path(".") / "so2_heatmap.html"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    heatmap.save(output_path)
-    print(f"✅ Heatmap saved to: {output_path.resolve()}")
-
-    # Close opened files
-    for file in dataset:
-        file.close()
-
-
-if __name__ == "__main__":
-    main()
+    # Plotting
+    plt.figure(figsize=(8, 6))
+    plt.plot(ozone_masked, pressure_masked, marker='o')
+    plt.xlabel(f'{title} ({units})')
+    plt.ylabel(f'Pressure ({pres_units})')
+    
+    # Convert time to human-readable format
+    base_time = datetime.datetime(1993, 1, 1)
+    timedatum = (base_time + datetime.timedelta(seconds=time[tdim])).strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Title including file basename, variable, time, and track info
+    basename = os.path.basename(FILE_NAME)
+    plt.title(f'{basename}\n{title} at Time = {timedatum} (track={track})', fontsize=11)
+    
+    # Invert y-axis so pressure decreases upward
+    plt.gca().invert_yaxis()
+    # Use log scale for pressure
+    plt.gca().set_yscale('log')
+    # Format y-axis ticks as integers
+    plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%d'))
+    plt.grid(True)
+    plt.tight_layout()
+    
+    # Save figure
+    pngfile = f"{basename}.py.png"
+    plt.savefig(pngfile)
+    plt.show()

@@ -1,104 +1,72 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Extract SO₂, Latitude, and Longitude from OMI HDF5 files and aggregate into a DataFrame.
-
-@author: mp10
-@coding assistant: [TGC-26092025]
+Author: masoom
+@coding assistant: TGC-DD26092025
+# pip install numpy matplotlib cartopy
 """
 
-# pip install numpy pandas h5py
-
-from pathlib import Path
-from typing import List
 import numpy as np
-import pandas as pd
-import h5py
-
-# Constants
-#DATA_DIR = Path("path/to/SO2/files")  # 🔒 Replace with actual directory path
-DATA_DIR = Path("D:/python learning/Satellite Data/SO2")
-FILE_PATTERN = "OMI*.he5"
-
-# HDF5 Keys
-SO2_KEY = "HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/ColumnAmountSO2"
-LAT_KEY = "HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Latitude"
-LON_KEY = "HDFEOS/GRIDS/OMI Total Column Amount SO2/Data Fields/Longitude"
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 
-def extract_values(file_path: Path) -> pd.DataFrame:
+def plot_random_points_basic_scatter(x: np.ndarray, y: np.ndarray) -> None:
     """
-    Extract SO2, latitude, and longitude data from an HDF5 file.
+    Plot random points on a simple scatter plot without geographic projection.
 
     Args:
-        file_path (Path): Path to the .he5 file.
-
-    Returns:
-        pd.DataFrame: Flattened DataFrame with columns ['Lat', 'Long', 'SO2']
+        x (np.ndarray): Array of x coordinates (longitude).
+        y (np.ndarray): Array of y coordinates (latitude).
     """
-    try:
-        with h5py.File(file_path, "r") as file:
-            so2_data = file[SO2_KEY][:]
-            lat_data = file[LAT_KEY][:]
-            lon_data = file[LON_KEY][:]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(x, y)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("Random Points (No Projection)")
+    plt.show()
 
-            # Flatten arrays (assuming 3D arrays, take middle time slice if needed)
-            if so2_data.ndim == 3:
-                so2_data = so2_data[1, :, :]  # use the second time slice
-            so2_data = np.squeeze(so2_data)
-            lat_data = np.squeeze(lat_data)
-            lon_data = np.squeeze(lon_data)
 
-            # Filter invalid values
-            so2_data = np.where(so2_data < 0, np.nan, so2_data)
+def plot_random_points_plate_carree(lon: np.ndarray, lat: np.ndarray) -> None:
+    """
+    Plot random points on a Plate Carrée map projection in increasing detail.
 
-            # Ensure shape compatibility
-            if so2_data.shape != lat_data.shape or so2_data.shape != lon_data.shape:
-                raise ValueError("Shape mismatch between SO2, latitude, and longitude arrays.")
+    Args:
+        lon (np.ndarray): Array of longitude values.
+        lat (np.ndarray): Array of latitude values.
+    """
+    # Basic scatter on PlateCarree projection
+    fig1, ax1 = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()}, figsize=(8, 6))
+    ax1.scatter(lon, lat)
+    ax1.set_title("Scatter on PlateCarree Projection (No coastlines)")
+    plt.show()
 
-            flat_df = pd.DataFrame({
-                "Lat": lat_data.flatten(),
-                "Long": lon_data.flatten(),
-                "SO2": so2_data.flatten()
-            })
+    # Add coastlines
+    fig2, ax2 = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()}, figsize=(8, 6))
+    ax2.scatter(lon, lat)
+    ax2.coastlines()
+    ax2.set_title("Scatter on PlateCarree Projection with Coastlines")
+    plt.show()
 
-            return flat_df
-
-    except Exception as e:
-        print(f"Error processing file {file_path.name}: {e}")
-        return pd.DataFrame(columns=["Lat", "Long", "SO2"])
+    # Add stock image and coastlines
+    fig3, ax3 = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()}, figsize=(8, 6))
+    ax3.scatter(lon, lat)
+    ax3.stock_img()
+    ax3.coastlines()
+    ax3.set_title("Scatter on PlateCarree Projection with Stock Image and Coastlines")
+    plt.show()
 
 
 def main() -> None:
     """
-    Main function to aggregate all SO2 datasets into a single DataFrame.
+    Main function to generate random points and plot them.
     """
-    print("Scanning for OMI HE5 files...")
+    np.random.seed(1)
+    x = 360 * np.random.rand(100)
+    y = 180 * np.random.rand(100) - 90
 
-    all_files = list(DATA_DIR.glob(FILE_PATTERN))
-    if not all_files:
-        print(f"No files found in: {DATA_DIR}")
-        return
-
-    combined_df_list: List[pd.DataFrame] = []
-
-    for file_path in all_files:
-        print(f"Processing: {file_path.name}")
-        df = extract_values(file_path)
-        if not df.empty:
-            combined_df_list.append(df)
-
-    if combined_df_list:
-        full_df = pd.concat(combined_df_list, ignore_index=True)
-        print("Final DataFrame preview:")
-        print(full_df.head())
-
-        # Optionally save the result
-        output_file = DATA_DIR / "combined_so2_data.csv"
-        full_df.to_csv(output_file, index=False)
-        print(f"Saved combined data to: {output_file.resolve()}")
-    else:
-        print("No valid data was extracted.")
+    plot_random_points_basic_scatter(x, y)
+    plot_random_points_plate_carree(x, y)
 
 
 if __name__ == "__main__":
